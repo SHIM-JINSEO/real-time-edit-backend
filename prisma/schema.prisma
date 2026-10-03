@@ -7,19 +7,15 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  posts     Post[]
-}
-
-model Post {
-  id        Int     @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean @default(false)
-  author    User?   @relation(fields: [authorId], references: [id])
-  authorId  Int?
+/// A collaboratively edited document.
+/// `yjsState` is the CRDT source of truth; `title`/`content` are plain-text
+/// snapshots derived from it whenever Hocuspocus stores the document.
+model Document {
+  id         String   @id @default(uuid())
+  title      String   @default("Untitled")
+  content    String   @default("")
+  yjsState   Bytes?
+  shareToken String   @unique @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
