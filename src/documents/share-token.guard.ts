@@ -1,13 +1,22 @@
 import {
+  applyDecorators,
   CanActivate,
   ExecutionContext,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  ApiForbiddenResponse,
+  ApiQuery,
+  ApiSecurity,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 import { DocumentsService } from './documents.service.js';
 
 export const SHARE_TOKEN_HEADER = 'x-share-token';
+/** Name of the security scheme registered in swagger.setup.ts. */
+export const SHARE_TOKEN_SECURITY = 'share-token';
 
 /**
  * Protects `/documents/:id` routes. The token may come from the
@@ -34,4 +43,18 @@ export function extractShareToken(req: Request): string | undefined {
   const query = req.query?.token;
   if (typeof query === 'string' && query.length > 0) return query;
   return undefined;
+}
+
+/** Swagger docs for routes protected by ShareTokenGuard. */
+export function ApiShareToken() {
+  return applyDecorators(
+    ApiSecurity(SHARE_TOKEN_SECURITY),
+    ApiQuery({
+      name: 'token',
+      required: false,
+      description: `Share token as a query parameter (alternative to the ${SHARE_TOKEN_HEADER} header)`,
+    }),
+    ApiUnauthorizedResponse({ description: 'Share token missing' }),
+    ApiForbiddenResponse({ description: 'Share token does not match' }),
+  );
 }

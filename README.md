@@ -28,6 +28,8 @@ curl -s -X POST localhost:3000/api/documents -H 'content-type: application/json'
 
 ## API
 
+브라우저에서 **http://localhost:3000/api-docs** (Swagger UI)를 열면 모든 REST API를 보고 바로 호출해 볼 수 있습니다. 원본 OpenAPI JSON은 `/api-docs-json`. (`NODE_ENV=production`이면 비활성화)
+
 | Method | Path | Auth |
 |---|---|---|
 | POST | `/api/documents` | – |

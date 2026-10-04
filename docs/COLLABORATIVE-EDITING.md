@@ -515,11 +515,14 @@ bun install
 bun run db:up            # PostgreSQL 17 (docker compose)
 bun run db:migrate       # prisma migrate dev
 bun run start:dev        # http://localhost:3000/api , ws://localhost:3000/collaboration
+                         # Swagger UI: http://localhost:3000/api-docs
 ```
 
 ### 10.2 REST API 레퍼런스
 
 Base URL: `/api`
+
+> 아래 표의 대화형 버전이 **Swagger UI**(`http://localhost:3000/api-docs`)에 있습니다. 자세한 사용법은 [10.2.1](#1021-swagger-ui로-api-문서-보기).
 
 | Method | Path | 인증 | Body | 응답 |
 |---|---|---|---|---|
@@ -534,6 +537,46 @@ Base URL: `/api`
 
 문서 응답: `{ id, title, content, shareToken, createdAt, updatedAt }`
 오류: `400` 검증 실패 · `401` 토큰 없음 · `403` 토큰 불일치 · `404` 없음
+
+#### 10.2.1 Swagger UI로 API 문서 보기
+
+| 주소 | 내용 |
+|---|---|
+| `http://localhost:3000/api-docs` | Swagger UI (문서 열람 + "Try it out"으로 직접 호출) |
+| `http://localhost:3000/api-docs-json` | OpenAPI 3 JSON 원본 (Postman·코드 생성기에 import) |
+
+`NODE_ENV=production`이면 `main.ts`에서 등록하지 않으므로 운영 환경에는 노출되지 않습니다. 포트를 바꿨다면(`PORT`) 주소의 `3000`도 바꿔야 합니다.
+
+**토큰이 필요한 API 호출하기**
+
+1. `POST /api/documents` → *Try it out* → *Execute*. 응답의 `shareToken`을 복사합니다.
+2. 오른쪽 위 **Authorize** 🔒 → `share-token` 칸에 붙여 넣고 *Authorize*.
+3. 이제 `GET/PATCH/DELETE /api/documents/{id}`에 `x-share-token` 헤더가 자동으로 붙습니다. (`persistAuthorization` 덕분에 새로고침해도 유지)
+
+> 시연 팁: 브라우저 편집기 두 개를 띄워 둔 상태에서 Swagger로 `PATCH`를 보내면, REST 수정이 CRDT 업데이트로 양쪽에 동시에 반영되는 것을 보여 줄 수 있습니다 (5.6절).
+
+**구현 방식**
+
+Swagger(OpenAPI) 문서는 `@nestjs/swagger`가 **런타임 메타데이터**를 읽어서 만듭니다. TypeScript `interface`는 컴파일 후 사라지기 때문에, 응답 타입을 `class` + `@ApiProperty()`로 선언해야 스키마가 문서에 나옵니다.
+
+```ts
+// src/documents/document.response.ts — interface → class 로 바꾼 이유
+export class DocumentSummary {
+  @ApiProperty({ example: 'CRDT talk' })
+  title: string;
+  // ...
+}
+export class DocumentResponse extends DocumentSummary { /* content, shareToken */ }
+```
+
+| 파일 | 역할 |
+|---|---|
+| `src/swagger.setup.ts` | 문서 제목·설명, `x-share-token` 헤더를 `apiKey` 보안 스킴(`share-token`)으로 등록, `/api-docs`에 마운트 |
+| `src/documents/share-token.guard.ts` | `@ApiShareToken()` — 가드가 걸린 라우트에 자물쇠, `?token=` 쿼리, 401/403 응답을 한 번에 문서화 |
+| `src/documents/dto/*.ts` | 요청 바디 필드에 `@ApiPropertyOptional()` |
+| 각 컨트롤러 | `@ApiTags`(그룹), `@ApiOperation`(요약), `@ApiOkResponse({ type })`(응답 스키마) |
+
+새 엔드포인트를 추가할 때도 이 패턴(응답은 class, 컨트롤러에 `@ApiOkResponse({ type })`)을 따르면 문서가 자동으로 갱신됩니다. WebSocket(`/collaboration`)은 OpenAPI로 표현할 수 없어 Swagger에는 나오지 않습니다 — 10.4절 참고.
 
 ### 10.3 curl 예시
 

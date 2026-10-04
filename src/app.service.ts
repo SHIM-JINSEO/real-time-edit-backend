@@ -1,8 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
 
-export interface HealthStatus {
+export class HealthStatus {
+  @ApiProperty({ enum: ['ok'] })
   status: 'ok';
+
+  @ApiProperty({ example: 'real-time-edit-backend' })
   service: string;
+
+  @ApiProperty({ format: 'date-time' })
   time: string;
 }
 
