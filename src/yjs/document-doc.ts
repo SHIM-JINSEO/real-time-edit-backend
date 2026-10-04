@@ -1,12 +1,8 @@
 import * as Y from 'yjs';
 
-/**
- * Shape of a collaborative document inside a Y.Doc.
- *
- * Both the title and the body are `Y.Text` CRDT types, so every connected
- * client (and the REST API, through a Hocuspocus direct connection) edits the
- * same conflict-free structure.
- */
+// This file contains utility functions for managing Yjs documents, including reading and writing text content, applying updates, and creating initial states.
+// It provides utility functions to work with Yjs documents in a collaborative editing context.
+
 export const TITLE_KEY = 'title';
 export const CONTENT_KEY = 'content';
 
@@ -15,7 +11,6 @@ export interface DocumentText {
   content: string;
 }
 
-/** Read the current plain-text snapshot out of a Y.Doc. */
 export function readDocumentText(doc: Y.Doc): DocumentText {
   return {
     title: doc.getText(TITLE_KEY).toString(),
@@ -23,21 +18,17 @@ export function readDocumentText(doc: Y.Doc): DocumentText {
   };
 }
 
-/**
- * Replace the value of a Y.Text with `next` using the smallest possible edit:
- * only the differing middle section is deleted/inserted. Keeping the common
- * prefix and suffix intact means concurrent edits by other peers in those
- * regions survive the merge instead of being clobbered.
- */
+// function to replace the text of a Y.Text object with a new string, minimizing the number of operations performed on the Yjs document.
 export function replaceText(text: Y.Text, next: string): void {
   const prev = text.toString();
   if (prev === next) return;
 
-  let start = 0;
+  let start = 0; // start index of the first differing character
   const maxStart = Math.min(prev.length, next.length);
   while (start < maxStart && prev[start] === next[start]) start++;
 
-  let endPrev = prev.length;
+  //end index of the last differing character in prev and next
+  let endPrev = prev.length; 
   let endNext = next.length;
   while (
     endPrev > start &&
@@ -52,11 +43,13 @@ export function replaceText(text: Y.Text, next: string): void {
     if (endPrev > start) text.delete(start, endPrev - start);
     if (endNext > start) text.insert(start, next.slice(start, endNext));
   };
-  if (text.doc) text.doc.transact(run);
-  else run();
+  if (text.doc) text.doc.transact(run); 
+  // if the Y.Text is associated with a Y.Doc, perform the update in a transaction(no intermediate states will be visible to observers)
+  else run(); 
+  // there is no Y.Doc associated with this Y.Text
 }
 
-/** Apply a partial text update (title and/or content) to a Y.Doc in one transaction. */
+// Apply a partial text update (title and/or content) to a Y.Doc in one transaction. */
 export function applyDocumentText(
   doc: Y.Doc,
   patch: Partial<DocumentText>,
@@ -71,16 +64,16 @@ export function applyDocumentText(
   });
 }
 
-/** Build the binary Yjs state for a brand-new document. */
+// Build the binary Yjs state for a brand-new document. 
 export function createInitialState(text: DocumentText): Uint8Array {
   const doc = new Y.Doc();
   applyDocumentText(doc, text);
-  const state = Y.encodeStateAsUpdate(doc);
+  const state = Y.encodeStateAsUpdate(doc); // encodes CRDT state of the Y.Doc into a binary format
   doc.destroy();
   return state;
 }
 
-/** Decode a stored Yjs state back into its plain-text snapshot. */
+// Decode a stored Yjs state back into its plain-text snapshot. 
 export function readStoredText(state: Uint8Array): DocumentText {
   const doc = new Y.Doc();
   Y.applyUpdate(doc, state);
